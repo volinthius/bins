@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+
+BOOKMARK=$(cat ~/.bookmarks | awk '{print $1}' | dmenu)
+URL=$(egrep "^$BOOKMARK .*$" ~/.bookmarks | awk '{print $2}')
+x-www-browser $URL
