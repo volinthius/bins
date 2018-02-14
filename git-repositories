@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+
+. /etc/bash_completion.d/git-prompt
+
+ACTION=$1
+
+if [ -z "$1" ]; then
+    ACTION="showbranch"
+fi
+
+REPO_DIR=${REPO_DIR:-"${HOME}/repos"}
+POSTFIX=".git/"
+
+showbranch () {
+    for repo in $(ls ${REPO_DIR}); do
+        printf "%-30s %s" ${repo} `GIT_DIR="${REPO_DIR}/${repo}/${POSTFIX}" __git_ps1`
+        echo
+    done
+}
+
+has_changes() {
+    OUTPUT=$(cd "$1/$2"; git status --porcelain | wc -l)
+    if [ ! $OUTPUT -eq 0 ]; then
+        printf "%s %s" "$2"
+        echo -n 'has changes'
+        echo " ($1/$2)"
+    fi
+}
+
+status() {
+    for repo in $(ls ${REPO_DIR}); do
+        has_changes "${REPO_DIR}" "${repo}"
+    done
+}
+
+$ACTION
