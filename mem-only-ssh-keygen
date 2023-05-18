@@ -1,0 +1,52 @@
+#!/bin/bash
+#
+# Generates a SSH key without touching disk
+#
+# Insipired by https://gist.github.com/kraftb/9918106.
+#
+
+set -e -u -o pipefail
+
+# We only print the temporary filename. This is unsafe but mkfifo will
+# fail if the file happens to exist.
+KEY_FIFO="$(mktemp --dry-run --tmpdir=.)"
+KEYPUB_FIFO="${KEY_FIFO}.pub"
+
+cleanup() {
+    # Remove FIFOs in case we fail
+    rm --force "${KEY_FIFO}" "${KEYPUB_FIFO}"
+}
+
+# We need to cleanup on exit
+trap cleanup EXIT
+
+# FIFOs are used to catch the output from SSH key generation. Limit
+# read-write access to user only.
+mkfifo --mode 0600 "${KEY_FIFO}" "${KEYPUB_FIFO}"
+
+# Redirect FIFOs to our file descriptors
+exec 4<>"${KEY_FIFO}"
+exec 5<>"${KEYPUB_FIFO}"
+
+# Generate a new SSH key without password, by writing to FIFOs. Force
+# FIFO overwrite with the "y"
+echo "y" | ssh-keygen -t ed25519 -f "${KEY_FIFO}" -N "" > /dev/null
+
+private_key=""
+first=1
+
+# Read the secret line by line. After the last line read hangs, so we
+# must timeout after a second.
+while read -t 1 -r line <&4; do
+    # Append newline, except for the last line.
+    [[ ${first} -eq 0 ]] && private_key="${private_key}\n"
+    first=0
+    private_key="${private_key}${line}"
+done
+
+# Read the public key
+read -r public_key <&5
+
+# Output
+echo -e "${private_key}"
+echo -e "${public_key}"
